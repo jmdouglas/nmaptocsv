@@ -16,47 +16,51 @@ namespace nmapToCSV
                 Console.Write("usage: nmaptocsv.exe <filename>.xml");
                 return;
             }
-            XElement xelement = XElement.Load(args[0]);
-            List<string> output = new List<string>();
+            var xelement = XElement.Load(args[0]);
+            var output = new List<string>
+            {
+                "Scan Information:",
+                "Number of services: " + xelement.Element("scaninfo")?.Attribute("numservices")?.Value ?? "Not Found",
+                "Start Time: " + xelement.Attribute("startstr")?.Value ?? "Not Found",
+                "Finish Time: " + xelement.Element("runstats")?.Element("finished")?.Attribute("timestr")?.Value ?? "Not Found",
+                "Scan arguments: " + xelement.Attribute("args")?.Value ?? "Not Found"
+            };
 
-            output.Add("Scan Information:");
-            output.Add("Number of services: " + xelement.Element("scaninfo").Attribute("numservices").Value);
-            output.Add("Start Time: " + xelement.Attribute("startstr").Value);
-            output.Add("Finish Time: " + xelement.Element("runstats").Element("finished").Attribute("timestr").Value);
-            output.Add("Scan arguments: " + xelement.Attribute("args").Value);
-
-            IEnumerable<XElement> hosts = xelement.Elements("host");
+            var hosts = xelement.Elements("host");
 
             output.Add("Host Name,Ip Address,MAC Address,OS Name,OS Family,OS Generation,OS Accuracy,Port,Service Name,Service Product,Service Version,Service Confidence");
             foreach (var host in hosts)
             {
-                string name = host.Element("hostnames").Element("hostname").Attribute("name").Value ?? "";
+                var name = host.Element("hostnames")?.Element("hostname")?.Attribute("name")?.Value ?? "";
                 string mac = "", ip = "";
-                if (host.Element("address").Attribute("addrtype").Value == "mac")
+                if (host.Element("address")?.Attribute("addrtype")?.Value == "mac")
                     mac = host.Element("address").Attribute("addr").Value;
                 else
-                    ip = host.Element("address").Attribute("addr").Value;
+                    ip = host.Element("address")?.Attribute("addr")?.Value ?? "No IP or MAC found";
 
-                XElement osMatch = host.Element("os").Element("osmatch");
-                string osName = osMatch.Attribute("name")?.Value ?? "";
-                string osFamily = osMatch.Element("osclass").Attribute("osfamily")?.Value ?? "";
-                string osGen = osMatch.Element("osclass").Attribute("osgen")?.Value ?? "";
-                string accuracy = osMatch.Element("osclass").Attribute("accuracy")?.Value ?? "";
+                var osMatch = host.Element("os")?.Element("osmatch");
+                var osName = osMatch?.Attribute("name")?.Value ?? "";
+                var osFamily = osMatch?.Element("osclass")?.Attribute("osfamily")?.Value ?? "";
+                var osGen = osMatch?.Element("osclass")?.Attribute("osgen")?.Value ?? "";
+                var accuracy = osMatch?.Element("osclass")?.Attribute("accuracy")?.Value ?? "";
 
                 //Service Name,Service Product,Service Version,Service Confidence
-                IEnumerable<XElement> ports = host.Element("ports").Elements("port");
+                var ports = host.Element("ports")?.Elements("port");
 
-                foreach (var port in ports)
-                {
-                    string portId = port.Attribute("portid")?.Value ?? "";
-                    string serviceName = port.Element("service").Attribute("name")?.Value ?? "";
-                    string serviceProduct = port.Element("service").Attribute("product")?.Value ?? "";
-                    string confidence = port.Element("service").Attribute("conf")?.Value ?? "";
-                    string version = port.Element("service").Attribute("version")?.Value ?? "";
-                    output.Add(name + "," + ip + "," + mac + "," + osName + "," + osFamily + "," + osGen + "," + accuracy + "," + portId + "," + serviceName + "," + serviceProduct + "," + version + "," + confidence);
-                }
+                output.AddRange(from port in ports
+                    let portId = port.Attribute("portid")?.Value ?? ""
+                    let serviceName = port.Element("service")?.Attribute("name")?.Value ?? ""
+                    let serviceProduct = port.Element("service")?.Attribute("product")?.Value ?? ""
+                    let confidence = port.Element("service")?.Attribute("conf")?.Value ?? ""
+                    let version = port.Element("service")?.Attribute("version")?.Value ?? ""
+                    select name + "," + ip + "," + mac + "," + osName + "," + osFamily + "," + osGen + "," + accuracy + "," + portId + "," + serviceName + "," + serviceProduct + "," + version + "," + confidence
+                );
             }
-            System.IO.File.WriteAllLines(args[0].Substring(0, args[0].IndexOf(".")) + ".csv", output);
+            //Remove old file type and append .csv (or append .csv if no file type found)
+            var extensionPos = args[0].LastIndexOf(".");
+            if (extensionPos == -1)
+                extensionPos = args[0].Length;
+            System.IO.File.WriteAllLines(args[0].Substring(0, extensionPos) + ".csv", output);
         }
     }
 }
